@@ -1,4 +1,5 @@
 Process Visualization GUI: A Fun Peek at CPU Scheduling! 🍳
+
 Why We Built This GUI
 Imagine your computer as a chef juggling a busy kitchen, picking which dish to cook first. That’s CPU scheduling, and our Process Visualization GUI makes it a blast to explore! This Python-based graphical interface turns complex operating system concepts into lively, colorful visuals. It’s perfect for students or tech enthusiasts who want to see how processes get managed without slogging through dense textbooks.
 Why visualize? Watching processes flow from “waiting” to “running” to “done” makes learning intuitive and exciting. It’s like seeing the CPU’s hidden dance come to life!
