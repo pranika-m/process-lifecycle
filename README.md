@@ -12,19 +12,16 @@ Round Robin (RR): Demonstrates fair time-sharing with configurable time quanta, 
 Priority Scheduling: Highlights priority-driven execution, allowing analysis of how high-priority tasks influence performance.
 Shortest Remaining Time First (SRTF): Illustrates preemptive efficiency by dynamically selecting the task with the least remaining time.
 
-
 Intuitive Graphical Interface:
 Define processes with precise attributes (PID, arrival time, burst time, and priority for Priority scheduling) to simulate real-world scenarios.
 Generate randomized process sets with a single click to quickly experiment with diverse workloads.
 Track process execution in a real-time table, displaying critical metrics like completion time, turnaround time, and waiting time.
 
-
 Insightful Visualizations:
 Gantt Chart: Maps the CPU’s scheduling timeline, providing a clear view of process execution order and duration.
 State Diagram: Uses vibrant colors to trace each process’s state transitions (New, Ready, Running, Waiting, Terminated), revealing scheduling behavior.
 Queue Display: Visualizes the ready queue and active process, offering a window into the CPU’s decision-making process.
-Performance Metrics: Quantifies efficiency with metrics like average turnaround time, waiting time, CPU utilization, and throughput, enabling deep analysis.
-
+Performance Metrics: QuantifiesEtiquette efficiency with metrics like average turnaround time, waiting time, CPU utilization, and throughput, enabling deep analysis.
 
 Flexible Customization: Adjust animation speed to study scheduling at your own pace and fine-tune the Round Robin time quantum to investigate its impact on performance.
 
@@ -35,7 +32,6 @@ Libraries:
 tkinter (included with Python for the GUI).
 matplotlib (install via pip install matplotlib for visualizations).
 
-
 Platforms: Windows, macOS, or Linux.
 
 Getting Started
@@ -44,15 +40,11 @@ Clone or download the project:
 git clone <repository-url>
 cd process-visualization-gui
 
-
 Install the visualization library:
 pip install matplotlib
 
-
 Launch the GUI:
 python process_visualizer.py
-
-
 
 How to Use
 Open the GUI: Run the script to start the interface.
