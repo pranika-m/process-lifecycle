@@ -20,6 +20,9 @@ class ProcessVisualizer:
             'Waiting': '#FFFF99', 'Terminated': '#CC99FF'
         }
         
+        # Initialize the current algorithm
+        self.current_algorithm = "FCFS"
+        
         # Main canvas with scrollbars
         self.main_canvas = tk.Canvas(self.root)
         self.v_scrollbar = ttk.Scrollbar(self.root, orient="vertical", command=self.main_canvas.yview)
@@ -71,21 +74,34 @@ class ProcessVisualizer:
         self.main_frame.bind("<Configure>", lambda e: self.main_canvas.configure(scrollregion=self.main_canvas.bbox("all")))
 
     def create_controls(self, parent):
-        """Create input fields, buttons, and ready queue display."""
-        fields = ["PID", "Arrival Time", "Burst Time", "Priority"]
+        # Base fields (always shown)
+        self.base_fields = ["PID", "Arrival Time", "Burst Time"]
         self.entries = {}
-        for i, field in enumerate(fields):
+        
+        # Create base fields
+        for i, field in enumerate(self.base_fields):
             ttk.Label(parent, text=f"{field}:").grid(row=i, column=0, pady=2, sticky="w")
             entry = ttk.Entry(parent, width=20)
             entry.grid(row=i, column=1, pady=2, sticky="ew")
             self.entries[field] = entry
+        
+        # Create priority field (shown conditionally)
+        self.priority_label = ttk.Label(parent, text="Priority:")
+        self.priority_label.grid(row=3, column=0, pady=2, sticky="w")
+        self.priority_entry = ttk.Entry(parent, width=20)
+        self.priority_entry.grid(row=3, column=1, pady=2, sticky="ew")
+        self.entries["Priority"] = self.priority_entry
+        
+        # Initially hide priority field
+        self.priority_label.grid_remove()
+        self.priority_entry.grid_remove()
         
         ttk.Label(parent, text="Algorithm:").grid(row=4, column=0, pady=2, sticky="w")
         self.algo_var = tk.StringVar(value="FCFS")
         self.algo_combo = ttk.Combobox(parent, textvariable=self.algo_var, 
                                       values=["FCFS", "SJF", "RR", "Priority", "SRTF"], width=20)
         self.algo_combo.grid(row=4, column=1, pady=2, sticky="ew")
-        self.algo_combo.bind("<<ComboboxSelected>>", self.toggle_quantum)
+        self.algo_combo.bind("<<ComboboxSelected>>", self.algorithm_changed)
         
         ttk.Label(parent, text="Quantum (RR):").grid(row=5, column=0, pady=2, sticky="w")
         self.quantum_entry = ttk.Entry(parent, state="disabled", width=20)
@@ -110,14 +126,31 @@ class ProcessVisualizer:
         self.ready_queue_list = tk.Listbox(self.ready_frame, height=5, width=25)
         self.ready_queue_list.pack(fill="both", expand=True)
 
-    def toggle_quantum(self, event=None):
-        """Enable/disable quantum entry based on algorithm."""
-        self.quantum_entry.config(state="normal" if self.algo_var.get() == "RR" else "disabled")
+    def algorithm_changed(self, event=None):
+        # Handle algorithm change event.
+        algorithm = self.algo_var.get()
+        self.current_algorithm = algorithm
+        
+        # Show/hide priority field based on algorithm
+        if algorithm == "Priority":
+            self.priority_label.grid()
+            self.priority_entry.grid()
+        else:
+            self.priority_label.grid_remove()
+            self.priority_entry.grid_remove()
+        
+        # Enable/disable quantum entry based on algorithm
+        self.quantum_entry.config(state="normal" if algorithm == "RR" else "disabled")
+        
+        # Update the table columns based on the algorithm
+        self.update_table_columns()
 
     def create_process_table(self, parent):
-        """Create the process table with scrollbars."""
+        #Create the process table with scrollbars.
         table_frame = ttk.Frame(parent)
         table_frame.pack(fill="both", expand=True)
+        
+        # Define all columns
         self.table = ttk.Treeview(table_frame, 
                                  columns=("PID", "AT", "BT", "Priority", "State", "TAT", "WT"), 
                                  show="headings")
@@ -128,13 +161,33 @@ class ProcessVisualizer:
         self.table.heading("State", text="State")
         self.table.heading("TAT", text="TAT")
         self.table.heading("WT", text="Waiting")
+        
+        # Configure column widths
+        self.table.column("PID", width=60)
+        self.table.column("AT", width=60)
+        self.table.column("BT", width=60)
+        self.table.column("Priority", width=60)
+        self.table.column("State", width=80)
+        self.table.column("TAT", width=60)
+        self.table.column("WT", width=60)
+        
+        # Initially hide Priority column
+        self.table.column("Priority", width=0, stretch=False)
+        
         self.table.pack(side="left", fill="both", expand=True)
         vsb = ttk.Scrollbar(table_frame, orient="vertical", command=self.table.yview)
         vsb.pack(side="right", fill="y")
         self.table.configure(yscrollcommand=vsb.set)
 
+    def update_table_columns(self):
+        #Update table columns based on the current algorithm.
+        if self.current_algorithm == "Priority":
+            self.table.column("Priority", width=60, stretch=True)  # Show Priority column
+        else:
+            self.table.column("Priority", width=0, stretch=False)  # Hide Priority column
+
     def create_visualizations(self, parent):
-        """Create visualizations with titles and proper alignment."""
+        #Create visualizations with titles and proper alignment.
         gantt_frame = ttk.LabelFrame(parent, text="Gantt Chart", padding="5")
         gantt_frame.grid(row=0, column=0, sticky="nsew", pady=5)
         self.gantt_fig, self.gantt_ax = plt.subplots(figsize=(12, 3))
@@ -163,14 +216,24 @@ class ProcessVisualizer:
         self.metrics_frame.grid(row=3, column=0, sticky="nsew", pady=5)
 
     def add_process(self):
-        """Add a process to the table."""
+        #Add a process to the table.
         try:
             pid = self.entries["PID"].get()
             at = float(self.entries["Arrival Time"].get())
             bt = float(self.entries["Burst Time"].get())
-            priority = float(self.entries["Priority"].get())
             
-            if not pid or at < 0 or bt <= 0 or priority < 0:
+            # Only require priority for Priority algorithm
+            if self.current_algorithm == "Priority":
+                if not self.priority_entry.get():
+                    raise ValueError("Priority is required for Priority scheduling")
+                priority = float(self.priority_entry.get())
+                if priority < 0:
+                    raise ValueError("Priority cannot be negative")
+            else:
+                # Default priority for non-Priority algorithms
+                priority = 0
+            
+            if not pid or at < 0 or bt <= 0:
                 raise ValueError("Invalid input values")
             
             process = {
@@ -180,19 +243,23 @@ class ProcessVisualizer:
             }
             self.processes.append(process)
             self.update_table()
+            
+            # Clear input fields
             for entry in self.entries.values():
                 entry.delete(0, tk.END)
+                
         except ValueError as e:
             messagebox.showerror("Error", str(e))
 
     def generate_random(self):
-        """Generate random processes."""
+        #Generate random processes.
         self.processes.clear()
         for i in range(5):
             bt = random.uniform(1, 10)
+            priority = random.randint(1, 5) if self.current_algorithm == "Priority" else 0
             process = {
                 'pid': f"P{i}", 'arrival': random.uniform(0, 5),
-                'burst': bt, 'priority': random.randint(1, 5),
+                'burst': bt, 'priority': priority,
                 'remaining': bt, 'state': 'New', 'states': [(0, 'New')],
                 'first_run': None, 'completion': None
             }
@@ -200,29 +267,45 @@ class ProcessVisualizer:
         self.update_table()
 
     def update_table(self, time=None):
-        """Update the process table dynamically."""
+        #Update the process table dynamically.
         for item in self.table.get_children():
             self.table.delete(item)
         process_list = self.all_processes if self.all_processes else self.processes
         self.table['height'] = max(len(process_list), 1)  # Dynamic height, min 1
+        
         for p in process_list:
             if time is None:
-                state = p['state']
+                if p.get('completion') is not None:
+                    state='Terminated'
+                else:
+                    state = p['state']
             else:
                 state = self.get_state_at_time(p, time)
+            
             tat = f"{p['tat']:.2f}" if 'tat' in p else '-'
             wt = f"{p['wt']:.2f}" if 'wt' in p else '-'
-            self.table.insert("", "end", values=(p['pid'], f"{p['arrival']:.2f}", f"{p['burst']:.2f}", p['priority'], state, tat, wt))
+            
+            values = [
+                p['pid'], 
+                f"{p['arrival']:.2f}", 
+                f"{p['burst']:.2f}",
+                p['priority'] if self.current_algorithm == "Priority" else "",
+                state, 
+                tat, 
+                wt
+            ]
+            
+            self.table.insert("", "end", values=values)
 
     def get_state_at_time(self, process, time):
-        """Get the state of a process at a specific time."""
+        #Get the state of a process at a specific time
         for t, s in reversed(process['states']):
             if t <= time:
                 return s
         return 'New'
 
     def start_simulation(self):
-        """Run the simulation and show visualizations."""
+        #Run the simulation and show visualizations
         if not self.processes:
             messagebox.showwarning("Warning", "No processes to simulate")
             return
@@ -243,11 +326,16 @@ class ProcessVisualizer:
         self.execution_order = []
         
         algorithm = self.algo_var.get()
-        self.quantum = float(self.quantum_entry.get()) if algorithm == "RR" else None
         self.algorithm = algorithm
+        self.current_algorithm = algorithm  
+        
+        # Get quantum for RR algorithm and initialize time slice counter
+        self.quantum = float(self.quantum_entry.get()) if algorithm == "RR" else None
+        self.time_slice = 0  # Track how long the current process has been running
         
         prev_running = None
         while self.processes or self.ready_queue or self.running_process:
+            # Add newly arrived processes to ready queue
             arrived = [p for p in self.processes if p['arrival'] <= self.current_time]
             for p in arrived:
                 p['state'] = 'Ready'
@@ -255,6 +343,7 @@ class ProcessVisualizer:
                 self.ready_queue.append(p)
                 self.processes.remove(p)
             
+            # Handle preemption for SRTF algorithm
             if self.running_process and self.algorithm == "SRTF" and self.ready_queue:
                 min_ready = min(self.ready_queue, key=lambda x: x['remaining'])
                 if min_ready['remaining'] < self.running_process['remaining']:
@@ -265,26 +354,44 @@ class ProcessVisualizer:
                     self.ready_queue.remove(min_ready)
                     self.running_process['state'] = 'Running'
                     self.running_process['states'].append((self.current_time, 'Running'))
+                    self.time_slice = 0  # Reset time slice for new process
             
+            # Handle Round Robin quantum properly
+            if self.algorithm == "RR" and self.running_process and self.time_slice >= self.quantum:
+                # Process has used its time quantum, move it back to ready queue
+                if self.running_process['remaining'] > 0:  # Only if not finished
+                    self.running_process['state'] = 'Ready'
+                    self.running_process['states'].append((self.current_time, 'Ready'))
+                    self.ready_queue.append(self.running_process)
+                    self.running_process = None
+                    self.time_slice = 0  # Reset time slice
+            
+            # Select next process if CPU is idle
             if not self.running_process and self.ready_queue:
                 self.select_next_process()
+                self.time_slice = 0  # Reset time slice for new process
             
+            # Track process changes for visualization
             if self.running_process != prev_running:
                 if self.running_process:
                     self.execution_order.append(self.running_process['pid'])
                 prev_running = self.running_process
             
+            # Process execution for current time unit
             if self.running_process:
                 if self.running_process['first_run'] is None:
                     self.running_process['first_run'] = self.current_time
                 
                 self.running_process['remaining'] -= 1
+                self.time_slice += 1  # Increment time slice counter
+                
                 self.gantt_data.append({
                     'pid': self.running_process['pid'],
                     'start': self.current_time,
                     'end': self.current_time + 1
                 })
                 
+                # Process completion
                 if self.running_process['remaining'] <= 0:
                     self.running_process['completion'] = self.current_time + 1
                     self.running_process['state'] = 'Terminated'
@@ -292,12 +399,9 @@ class ProcessVisualizer:
                     self.running_process['tat'] = self.running_process['completion'] - self.running_process['arrival']
                     self.running_process['wt'] = self.running_process['tat'] - self.running_process['burst']
                     self.running_process = None
-                elif self.algorithm == "RR" and (self.current_time - self.gantt_data[-1]['start']) >= self.quantum:
-                    self.running_process['state'] = 'Ready'
-                    self.running_process['states'].append((self.current_time, 'Ready'))
-                    self.ready_queue.append(self.running_process)
-                    self.running_process = None
+                    self.time_slice = 0  # Reset time slice
             
+            # Save the current state for animation
             state = {
                 'time': self.current_time,
                 'gantt_data': list(self.gantt_data),
@@ -306,6 +410,14 @@ class ProcessVisualizer:
             }
             self.simulation_steps.append(state)
             self.current_time += 1
+        
+        # Mark all processes as terminated after simulation
+        for p in self.all_processes:
+            if p.get('completion') is not None:
+                p['state'] = 'Terminated'
+        
+        # Update table columns based on the algorithm
+        self.update_table_columns()
         
         # Ensure final table update to show all processes as Terminated
         self.update_table()
