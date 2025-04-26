@@ -1,5 +1,5 @@
 
-# Process Visualization GUI: 
+# Process Life-Cycle Visualization GUI: 
 
 ## Why We Built This GUI
 
