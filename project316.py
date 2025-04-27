@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import random
 from matplotlib.animation import FuncAnimation
-
+       
+       
 class ProcessVisualizer:
     def __init__(self, root):
         self.root = root
@@ -39,10 +40,10 @@ class ProcessVisualizer:
         self.main_canvas.create_window((0, 0), window=self.main_frame, anchor="nw")
         
         # Configure main_frame with three columns for centering
-        self.main_frame.grid_columnconfigure(0, weight=1)  # Left gap
-        self.main_frame.grid_columnconfigure(1, weight=0)  # Content
-        self.main_frame.grid_columnconfigure(2, weight=1)  # Right gap
-        
+        self.main_frame.grid_columnconfigure(0, weight=1) 
+        self.main_frame.grid_columnconfigure(1, weight=0) 
+        self.main_frame.grid_columnconfigure(2, weight=1)  
+
         # Top section: Controls and Process Table
         self.top_frame = ttk.Frame(self.main_frame)
         self.top_frame.grid(row=0, column=1, sticky="ew", padx=5, pady=5)
@@ -218,25 +219,40 @@ class ProcessVisualizer:
         self.metrics_frame.grid(row=3, column=0, sticky="nsew", pady=5)
 
     def add_process(self):
-        # Add a process to the table.
         try:
             pid = self.entries["PID"].get()
-            at = float(self.entries["Arrival Time"].get())
-            bt = float(self.entries["Burst Time"].get())
+            if not pid:
+                raise ValueError("PID cannot be empty")
+            
+            try:
+                at = float(self.entries["Arrival Time"].get())
+                if at < 0:
+                    raise ValueError("Arrival time cannot be negative")
+            except ValueError:
+                raise ValueError("Arrival time must be a valid number")
+                
+            try:
+                bt = float(self.entries["Burst Time"].get())
+                if bt <= 0:
+                    raise ValueError("Burst time must be greater than zero")
+            except ValueError:
+                raise ValueError("Burst time must be a valid number")
             
             # Only require priority for Priority algorithm
             if self.current_algorithm == "Priority":
-                if not self.priority_entry.get():
-                    raise ValueError("Priority is required for Priority scheduling")
-                priority = float(self.priority_entry.get())
-                if priority < 0:
-                    raise ValueError("Priority cannot be negative")
+                try:
+                    priority = float(self.priority_entry.get())
+                    if priority < 0:
+                        raise ValueError("Priority cannot be negative")
+                except ValueError:
+                    raise ValueError("Priority must be a valid number")
             else:
                 # Default priority for non-Priority algorithms
                 priority = 0
             
-            if not pid or at < 0 or bt <= 0:
-                raise ValueError("Invalid input values")
+            # Check for duplicate PIDs
+            if any(p['pid'] == pid for p in self.processes):
+                raise ValueError(f"Process with PID {pid} already exists")
             
             process = {
                 'pid': pid, 'arrival': at, 'burst': bt, 'priority': priority,
@@ -249,17 +265,17 @@ class ProcessVisualizer:
             # Clear input fields
             for entry in self.entries.values():
                 entry.delete(0, tk.END)
+            
+            
                 
         except ValueError as e:
             messagebox.showerror("Error", str(e))
 
     def generate_random(self):
-        # Generate random processes.
         self.processes.clear()
         for i in range(5):
-            # Use integers for burst time instead of floating point
-            bt = random.randint(2, 10)  # Integer burst times (2-10)
-            arrival = random.randint(0, 5)  # Integer arrival times (0-5)
+            bt = random.randint(2, 10)  
+            arrival = random.randint(0, 5)  
             priority = random.randint(1, 5) if self.current_algorithm == "Priority" else 0
             process = {
                 'pid': f"P{i}", 'arrival': arrival,
@@ -317,10 +333,14 @@ class ProcessVisualizer:
         return 'New'
 
     def start_simulation(self):
-        # Run the simulation and show visualizations
         if not self.processes:
             messagebox.showwarning("Warning", "No processes to simulate")
             return
+        
+        for p in self.processes:
+            if 'pid' not in p or 'arrival' not in p or 'burst' not in p or 'remaining' not in p:
+                messagebox.showerror("Error", f"Process data incomplete: {p}")
+                return
         
         self.visual_frame.grid()
         self.all_processes = list(self.processes)
@@ -427,6 +447,7 @@ class ProcessVisualizer:
                 'ready_queue': [p['pid'] for p in self.ready_queue],
                 'running_process': self.running_process['pid'] if self.running_process else None
             }
+            step_time = 1
             self.simulation_steps.append(state)
             self.current_time += step_time
         
@@ -489,7 +510,7 @@ class ProcessVisualizer:
         elif self.algorithm == "RR":
             self.running_process = self.ready_queue.pop(0)
         elif self.algorithm == "Priority":
-            self.running_process = min(self.ready_queue, key=lambda x: x['priority'])
+            self.running_process = max(self.ready_queue, key=lambda x: x['priority'])
             self.ready_queue.remove(self.running_process)
         
         self.running_process['state'] = 'Running'
@@ -528,7 +549,6 @@ class ProcessVisualizer:
             self.show_execution_order()
 
     def update_states(self, frame):
-        """Update the state diagram during animation."""
         self.state_ax.clear()
         state = self.simulation_steps[frame]
         current_time = state['time']
@@ -575,7 +595,7 @@ class ProcessVisualizer:
         self.queue_canvas.draw()
 
     def calculate_metrics(self):
-        """Calculate and display performance metrics."""
+        
         for widget in self.metrics_frame.winfo_children():
             widget.destroy()
         
